@@ -504,4 +504,8 @@ export class BitwigKnowledge {
   isBitwigConnected(): boolean {
     return this.controller.getConnectionStatus()
   }
+
+  async checkBitwigConnectionAsync(): Promise<boolean> {
+    return await this.controller.waitForInitialization()
+  }
 } 

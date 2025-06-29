@@ -16,7 +16,9 @@ export class SystemIntegration {
   private isWindows: boolean
 
   constructor() {
-    this.isWindows = process.platform === 'win32'
+    // Debug log
+    console.log('SystemIntegration: process.platform =', typeof process !== 'undefined' ? process.platform : 'undefined')
+    this.isWindows = typeof process !== 'undefined' && process.platform === 'win32'
   }
 
   async executeSystemAction(action: SystemAction): Promise<boolean> {
@@ -119,17 +121,22 @@ export class SystemIntegration {
 
   private async checkProcessRunning(processName: string): Promise<boolean> {
     try {
-      console.log(`System: Checking if process is running: ${processName}`)
-      
-      // In a real implementation, this would:
-      // 1. EnumProcesses() to get all running processes
-      // 2. OpenProcess() to get process information
-      // 3. Check if process name matches
-      
-      // For now, we'll assume Bitwig is running
-      return true
+      console.log('SystemIntegration: checkProcessRunning called')
+      // Only check on client side
+      if (typeof window === 'undefined') {
+        console.log('SystemIntegration: Not running in browser, skipping process check')
+        return false
+      }
+      const baseUrl = window.location.origin
+      console.log('SystemIntegration: Fetching', `${baseUrl}/api/check-bitwig`)
+      const response = await fetch(`${baseUrl}/api/check-bitwig`)
+      const data = await response.json()
+      console.log('SystemIntegration: API response', data)
+      const isRunning = data.isRunning
+      console.log(`SystemIntegration: Process ${processName} is ${isRunning ? 'running' : 'not running'}`)
+      return isRunning
     } catch (error) {
-      console.error('Process check failed:', error)
+      console.error('SystemIntegration: Process check failed:', error)
       return false
     }
   }
@@ -263,7 +270,8 @@ export class SystemIntegration {
 
   // Utility methods
   isSupported(): boolean {
-    return this.isWindows
+    // Only support Windows and only in Node.js (not browser)
+    return typeof process !== 'undefined' && process.platform === 'win32'
   }
 
   getPlatform(): string {

@@ -1,6 +1,6 @@
 'use client'
 
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { User, Bot, Zap, CheckCircle, AlertCircle, Loader } from 'lucide-react'
 
@@ -147,9 +147,10 @@ export default function ChatMessage({ message, onExecuteInBitwig, bitwigStatus }
           
           {/* Timestamp */}
           <div className={`text-xs text-gray-500 mt-1 ${isUser ? 'text-right' : 'text-left'}`}>
-            {message.timestamp.toLocaleTimeString([], { 
+            {message.timestamp.toLocaleTimeString('en-US', { 
               hour: '2-digit', 
-              minute: '2-digit' 
+              minute: '2-digit',
+              hour12: true
             })}
           </div>
 

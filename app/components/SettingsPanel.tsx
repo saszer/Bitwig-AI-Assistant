@@ -2,15 +2,16 @@
 
 import React, { useState, useEffect } from "react";
 import { getUserProfile, saveUserProfile, setVSTFolders, UserProfile } from "../lib/user-profile";
-import { CheckCircle, AlertCircle, Folder, X } from "lucide-react";
+import { CheckCircle, AlertCircle, Folder, X, RefreshCw } from "lucide-react";
 
 interface SettingsPanelProps {
   isOpen: boolean;
   onClose: () => void;
   bitwigStatus: "connected" | "disconnected" | "checking";
+  onRefreshConnection?: () => void;
 }
 
-export default function SettingsPanel({ isOpen, onClose, bitwigStatus }: SettingsPanelProps) {
+export default function SettingsPanel({ isOpen, onClose, bitwigStatus, onRefreshConnection }: SettingsPanelProps) {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [vstFolders, setFolders] = useState<string[]>([]);
   const [theme, setTheme] = useState<"dark" | "light">("dark");
@@ -74,6 +75,15 @@ export default function SettingsPanel({ isOpen, onClose, bitwigStatus }: Setting
             <span className="flex items-center text-red-400"><AlertCircle size={16} className="mr-1" /> Disconnected</span>
           ) : (
             <span className="flex items-center text-blue-400"><span className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin mr-1" /> Checking...</span>
+          )}
+          {onRefreshConnection && (
+            <button
+              className="text-gray-400 hover:text-white ml-2"
+              onClick={onRefreshConnection}
+              title="Refresh connection"
+            >
+              <RefreshCw size={16} />
+            </button>
           )}
         </div>
         <div className="mb-4">

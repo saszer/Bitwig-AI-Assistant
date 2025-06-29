@@ -1,5 +1,3 @@
-import { SystemIntegration } from './system-integration'
-
 interface BitwigAction {
   type: 'click' | 'drag' | 'keyboard' | 'menu' | 'parameter' | 'device' | 'track'
   target: string
@@ -16,38 +14,64 @@ interface BitwigResponse {
 
 export class BitwigController {
   private isConnected: boolean = false
-  private systemIntegration: SystemIntegration
+  private isInitialized: boolean = false
   private actionQueue: BitwigAction[] = []
 
   constructor() {
-    this.systemIntegration = new SystemIntegration()
-    this.initializeConnection()
+    // Only initialize connection on client side
+    if (typeof window !== 'undefined') {
+      this.initializeConnection()
+    }
   }
 
   private async initializeConnection() {
     try {
-      // Check if system integration is supported
-      if (!this.systemIntegration.isSupported()) {
-        console.warn('System integration not supported on this platform')
+      console.log('BitwigController: Initializing connection...')
+      
+      // Check if we're in browser environment
+      if (typeof window === 'undefined') {
+        console.log('BitwigController: Not in browser, skipping initialization')
         this.isConnected = false
+        this.isInitialized = true
         return
       }
 
-      // Check if Bitwig Studio is running
-      this.isConnected = await this.checkBitwigRunning()
+      // Use API route to check Bitwig status
+      const baseUrl = window.location.origin
+      console.log('BitwigController: Checking Bitwig via API...')
+      const response = await fetch(`${baseUrl}/api/check-bitwig`)
+      const data = await response.json()
+      
+      this.isConnected = data.isRunning
+      this.isInitialized = true
+      
       if (this.isConnected) {
-        console.log('Bitwig Studio detected and ready for control')
+        console.log('BitwigController: Bitwig Studio detected and ready for control')
       } else {
-        console.log('Bitwig Studio not detected. Please start Bitwig Studio first.')
+        console.log('BitwigController: Bitwig Studio not detected. Please start Bitwig Studio first.')
       }
     } catch (error) {
-      console.error('Failed to initialize Bitwig connection:', error)
+      console.error('BitwigController: Failed to initialize Bitwig connection:', error)
       this.isConnected = false
+      this.isInitialized = true
     }
   }
 
   private async checkBitwigRunning(): Promise<boolean> {
-    return await this.systemIntegration.checkBitwigRunning()
+    // Use API route instead of SystemIntegration
+    if (typeof window === 'undefined') {
+      return false
+    }
+    
+    try {
+      const baseUrl = window.location.origin
+      const response = await fetch(`${baseUrl}/api/check-bitwig`)
+      const data = await response.json()
+      return data.isRunning
+    } catch (error) {
+      console.error('BitwigController: Failed to check Bitwig status:', error)
+      return false
+    }
   }
 
   async executeAction(action: BitwigAction): Promise<BitwigResponse> {
@@ -395,11 +419,23 @@ export class BitwigController {
   }
 
   getConnectionStatus(): boolean {
+    return this.isConnected && this.isInitialized
+  }
+
+  isInitializationComplete(): boolean {
+    return this.isInitialized
+  }
+
+  async waitForInitialization(): Promise<boolean> {
+    while (!this.isInitialized) {
+      await new Promise(resolve => setTimeout(resolve, 100))
+    }
     return this.isConnected
   }
 
   async reconnect(): Promise<boolean> {
     this.isConnected = false
+    this.isInitialized = false
     await this.initializeConnection()
     return this.isConnected
   }

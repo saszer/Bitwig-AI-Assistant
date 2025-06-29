@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Send, Mic, MicOff, Settings, Play, Pause, RotateCcw, Zap, CheckCircle, AlertCircle } from 'lucide-react'
+import { Send, Mic, MicOff, Settings, Play, Pause, RotateCcw, Zap, CheckCircle, AlertCircle, RefreshCw } from 'lucide-react'
 import ChatMessage from './ChatMessage'
 import StepByStepGuide from './StepByStepGuide'
 import MouseOverlay from './MouseOverlay'
@@ -80,9 +80,14 @@ export default function BitwigAssistant() {
 
   useEffect(() => {
     // Check Bitwig connection status
-    const checkConnection = () => {
-      const isConnected = bitwigKnowledge.isBitwigConnected()
-      setBitwigStatus(isConnected ? 'connected' : 'disconnected')
+    const checkConnection = async () => {
+      try {
+        const isConnected = await bitwigKnowledge.checkBitwigConnectionAsync()
+        setBitwigStatus(isConnected ? 'connected' : 'disconnected')
+      } catch (error) {
+        console.error('Error checking Bitwig connection:', error)
+        setBitwigStatus('disconnected')
+      }
     }
     
     checkConnection()
@@ -229,6 +234,17 @@ export default function BitwigAssistant() {
     setShowMouseOverlay(!showMouseOverlay)
   }
 
+  const handleRefreshConnection = async () => {
+    setBitwigStatus('checking')
+    try {
+      const isConnected = await bitwigKnowledge.checkBitwigConnectionAsync()
+      setBitwigStatus(isConnected ? 'connected' : 'disconnected')
+    } catch (error) {
+      console.error('Error refreshing Bitwig connection:', error)
+      setBitwigStatus('disconnected')
+    }
+  }
+
   const getStatusIcon = () => {
     switch (bitwigStatus) {
       case 'connected':
@@ -265,6 +281,13 @@ export default function BitwigAssistant() {
                   {bitwigStatus === 'connected' ? 'Connected' : 
                    bitwigStatus === 'disconnected' ? 'Disconnected' : 'Checking...'}
                 </span>
+                <button
+                  onClick={handleRefreshConnection}
+                  className="text-gray-400 hover:text-white ml-1"
+                  title="Refresh connection"
+                >
+                  <RefreshCw size={14} />
+                </button>
               </div>
               
               <button
@@ -367,7 +390,7 @@ export default function BitwigAssistant() {
       )}
 
       {/* Settings Panel */}
-      <SettingsPanel isOpen={showSettings} onClose={() => setShowSettings(false)} bitwigStatus={bitwigStatus} />
+      <SettingsPanel isOpen={showSettings} onClose={() => setShowSettings(false)} bitwigStatus={bitwigStatus} onRefreshConnection={handleRefreshConnection} />
     </div>
   )
 } 
