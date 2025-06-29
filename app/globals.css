@@ -1,0 +1,48 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-bitwig-primary text-bitwig-text;
+  }
+}
+
+@layer components {
+  .bitwig-button {
+    @apply bg-bitwig-accent hover:bg-bitwig-accent/80 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200;
+  }
+  
+  .bitwig-card {
+    @apply bg-bitwig-secondary rounded-lg p-6 border border-gray-700 shadow-lg;
+  }
+  
+  .bitwig-input {
+    @apply bg-bitwig-secondary border border-gray-600 rounded-lg px-4 py-2 text-bitwig-text placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-bitwig-accent;
+  }
+  
+  .mouse-overlay {
+    @apply absolute w-6 h-6 bg-red-500 rounded-full border-2 border-white shadow-lg animate-pulse-slow pointer-events-none;
+  }
+  
+  .step-indicator {
+    @apply inline-flex items-center justify-center w-8 h-8 bg-bitwig-accent text-white rounded-full text-sm font-bold;
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-bitwig-secondary;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-gray-600 rounded-full;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-gray-500;
+} 
