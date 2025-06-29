@@ -2,11 +2,12 @@
 
 import React, { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Send, Mic, MicOff, Settings, Play, Pause, RotateCcw } from 'lucide-react'
+import { Send, Mic, MicOff, Settings, Play, Pause, RotateCcw, Zap, CheckCircle, AlertCircle } from 'lucide-react'
 import ChatMessage from './ChatMessage'
 import StepByStepGuide from './StepByStepGuide'
 import MouseOverlay from './MouseOverlay'
 import { BitwigKnowledge } from '../lib/bitwig-knowledge'
+import SettingsPanel from './SettingsPanel'
 
 interface Message {
   id: string
@@ -15,6 +16,10 @@ interface Message {
   timestamp: Date
   steps?: Step[]
   mousePositions?: MousePosition[]
+  actions?: BitwigAction[]
+  canExecute?: boolean
+  executionStatus?: 'pending' | 'executing' | 'completed' | 'failed'
+  executionResults?: string[]
 }
 
 interface Step {
@@ -23,6 +28,7 @@ interface Step {
   description: string
   mousePosition?: MousePosition
   screenshot?: string
+  action?: BitwigAction
 }
 
 interface MousePosition {
@@ -32,12 +38,20 @@ interface MousePosition {
   description: string
 }
 
+interface BitwigAction {
+  type: 'click' | 'drag' | 'keyboard' | 'menu' | 'parameter' | 'device' | 'track'
+  target: string
+  value?: any
+  coordinates?: { x: number; y: number }
+  description: string
+}
+
 export default function BitwigAssistant() {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
       type: 'assistant',
-      content: "Hello! I'm your Bitwig Studio AI assistant. I can help you with:\n\n• Step-by-step tutorials\n• Technical recommendations\n• Workflow optimization\n• Troubleshooting\n• Advanced techniques\n\nWhat would you like to learn about Bitwig today?",
+      content: "Hello! I'm your Bitwig Studio AI assistant. I can help you with:\n\n• Step-by-step tutorials\n• Technical recommendations\n• Workflow optimization\n• Troubleshooting\n• Advanced techniques\n• **Direct Bitwig control** - I can actually perform actions in Bitwig Studio!\n\nWhat would you like to learn about or have me do in Bitwig today?",
       timestamp: new Date()
     }
   ])
@@ -49,8 +63,10 @@ export default function BitwigAssistant() {
   const [currentStepIndex, setCurrentStepIndex] = useState(0)
   const [showMouseOverlay, setShowMouseOverlay] = useState(false)
   const [mousePositions, setMousePositions] = useState<MousePosition[]>([])
+  const [bitwigStatus, setBitwigStatus] = useState<'connected' | 'disconnected' | 'checking'>('checking')
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const [showSettings, setShowSettings] = useState(false)
 
   const bitwigKnowledge = new BitwigKnowledge()
 
@@ -61,6 +77,19 @@ export default function BitwigAssistant() {
   useEffect(() => {
     scrollToBottom()
   }, [messages])
+
+  useEffect(() => {
+    // Check Bitwig connection status
+    const checkConnection = () => {
+      const isConnected = bitwigKnowledge.isBitwigConnected()
+      setBitwigStatus(isConnected ? 'connected' : 'disconnected')
+    }
+    
+    checkConnection()
+    const interval = setInterval(checkConnection, 5000) // Check every 5 seconds
+    
+    return () => clearInterval(interval)
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -86,7 +115,10 @@ export default function BitwigAssistant() {
         content: response.answer,
         timestamp: new Date(),
         steps: response.steps,
-        mousePositions: response.mousePositions
+        mousePositions: response.mousePositions,
+        actions: response.actions,
+        canExecute: response.canExecute,
+        executionStatus: 'pending'
       }
 
       setMessages(prev => [...prev, assistantMessage])
@@ -113,6 +145,48 @@ export default function BitwigAssistant() {
       setMessages(prev => [...prev, errorMessage])
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const handleExecuteInBitwig = async (messageId: string) => {
+    const messageIndex = messages.findIndex(m => m.id === messageId)
+    if (messageIndex === -1 || !messages[messageIndex].actions) return
+
+    const message = messages[messageIndex]
+    
+    // Update message status to executing
+    setMessages(prev => prev.map((m, i) => 
+      i === messageIndex 
+        ? { ...m, executionStatus: 'executing' as const }
+        : m
+    ))
+
+    try {
+      const results = await bitwigKnowledge.executeActions(message.actions!)
+      
+      // Update message with results
+      setMessages(prev => prev.map((m, i) => 
+        i === messageIndex 
+          ? { 
+              ...m, 
+              executionStatus: 'completed' as const,
+              executionResults: results,
+              content: m.content + '\n\n✅ **Actions completed in Bitwig Studio!**\n\n' + results.map(r => `• ${r}`).join('\n')
+            }
+          : m
+      ))
+
+    } catch (error) {
+      // Update message with error
+      setMessages(prev => prev.map((m, i) => 
+        i === messageIndex 
+          ? { 
+              ...m, 
+              executionStatus: 'failed' as const,
+              content: m.content + '\n\n❌ **Failed to execute actions in Bitwig Studio.**\n\nPlease make sure Bitwig Studio is running and try again.'
+            }
+          : m
+      ))
     }
   }
 
@@ -155,6 +229,17 @@ export default function BitwigAssistant() {
     setShowMouseOverlay(!showMouseOverlay)
   }
 
+  const getStatusIcon = () => {
+    switch (bitwigStatus) {
+      case 'connected':
+        return <CheckCircle size={16} className="text-green-400" />
+      case 'disconnected':
+        return <AlertCircle size={16} className="text-red-400" />
+      case 'checking':
+        return <div className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
+    }
+  }
+
   return (
     <div className="flex h-screen">
       {/* Main Chat Interface */}
@@ -172,14 +257,20 @@ export default function BitwigAssistant() {
               </div>
             </div>
             <div className="flex items-center space-x-2">
+              {/* Bitwig Status */}
+              <div className="flex items-center space-x-2 px-3 py-1 bg-gray-800 rounded-lg">
+                <span className="text-gray-300 text-sm">Bitwig:</span>
+                {getStatusIcon()}
+                <span className="text-gray-300 text-sm">
+                  {bitwigStatus === 'connected' ? 'Connected' : 
+                   bitwigStatus === 'disconnected' ? 'Disconnected' : 'Checking...'}
+                </span>
+              </div>
+              
               <button
-                onClick={handleMouseOverlayToggle}
-                className={`p-2 rounded-lg transition-colors ${
-                  showMouseOverlay 
-                    ? 'bg-bitwig-accent text-white' 
-                    : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                }`}
-                title="Toggle Mouse Overlay"
+                onClick={() => setShowSettings(true)}
+                className={`p-2 rounded-lg transition-colors bg-gray-700 text-gray-300 hover:bg-gray-600`}
+                title="Open Settings"
               >
                 <Settings size={20} />
               </button>
@@ -198,7 +289,11 @@ export default function BitwigAssistant() {
                 exit={{ opacity: 0, y: -20 }}
                 transition={{ duration: 0.3 }}
               >
-                <ChatMessage message={message} />
+                <ChatMessage 
+                  message={message} 
+                  onExecuteInBitwig={() => handleExecuteInBitwig(message.id)}
+                  bitwigStatus={bitwigStatus}
+                />
               </motion.div>
             ))}
           </AnimatePresence>
@@ -226,7 +321,7 @@ export default function BitwigAssistant() {
                 type="text"
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
-                placeholder="Ask me anything about Bitwig Studio..."
+                placeholder="Ask me anything about Bitwig Studio or tell me what to do..."
                 className="bitwig-input w-full pr-12"
                 disabled={isLoading}
               />
@@ -270,6 +365,9 @@ export default function BitwigAssistant() {
       {showMouseOverlay && mousePositions.length > 0 && (
         <MouseOverlay positions={mousePositions} />
       )}
+
+      {/* Settings Panel */}
+      <SettingsPanel isOpen={showSettings} onClose={() => setShowSettings(false)} bitwigStatus={bitwigStatus} />
     </div>
   )
 } 
